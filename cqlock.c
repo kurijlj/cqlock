@@ -17,7 +17,7 @@
 /*
  * Terminal application to display current time in the qlocktwo fashion. It is C
  * implementation of script written for conky (http://pastebin.com/wK7JmG9H).
- * Mid (midtone) theme was inspired by solarized theme
+ * Mid (midtone) color scheme was inspired by solarized color scheme
  * (http://ethanschoonover.com/solarized) so it is best used with background
  * color #002B36.
  *
@@ -32,7 +32,7 @@
 #include <libintl.h>
 /* required by setlocale */
 #include <locale.h>
-/* required by strrchr */
+/* required by strrchr and strncmp */
 #include <string.h>
 /* required by EXIT_SUCCESS */
 #include <stdlib.h>
@@ -86,7 +86,7 @@
  * ANSI color escape codes.
  */
 #define COLOR_WHITE      "\x1b[38;5;255m"
-#define COLOR_DIM_WHITE  "\x1b[38;5;252m"
+#define COLOR_DIM_WHITE  "\x1b[38;5;253m"
 #define COLOR_DARK_WHITE "\x1b[38;5;245m"
 #define COLOR_LIGHT_GRAY "\x1b[38;5;237m"
 #define COLOR_DARK_GRAY  "\x1b[38;5;235m"
@@ -95,12 +95,99 @@
 
 
 /**
+ * scheme - Structure to hold color scheme information.
+ */
+typedef struct
+{
+	const char *title;
+	const char *accent;
+	const char *frgrnd;
+	const char *bkgrnd;
+} ColorScheme;
+
+/**
+ * Define color schemes. Title must not be longer than 20 characters.
+ */
+static ColorScheme schemes[] = {
+	{
+		.title = "light",
+		.accent = COLOR_BLACK,
+		.frgrnd = COLOR_DIM_WHITE,
+		.bkgrnd = COLOR_WHITE
+	},
+	{
+		.title = "mid",
+		.accent = COLOR_DARK_WHITE,
+		.frgrnd = COLOR_LIGHT_GRAY,
+		.bkgrnd = COLOR_DARK_GRAY
+	},
+	{
+		.title = "dark",
+		.accent = COLOR_WHITE,
+		.frgrnd = COLOR_DARK_GRAY,
+		.bkgrnd = COLOR_BLACK
+	},
+	{NULL}
+};
+
+/**
+ * Points to scheme being used.
+ */
+static ColorScheme *scheme;
+
+/**
+ * Color reset sequence;
+ */
+const char reset[] = COLOR_RESET;
+
+/**
+ * validate_scheme_title - Validate if given string is title for one of
+ * predefined color schemes.
+ */
+static unsigned short validate_scheme_title (const char *title)
+{
+	unsigned int c = 0;
+
+	if (NULL != title)
+	{
+		while (NULL != schemes[c].title)
+		{
+			if (!strncmp (schemes[c].title, title, strnlen (schemes[c].title, 20)))
+				return 1;
+			c++;
+		}
+	}
+
+	return 0;
+}
+
+static ColorScheme *scheme_by_title (const char *title)
+{
+	ColorScheme *r = &schemes[2];
+	unsigned int c = 0;
+
+	if (NULL != title)
+	{
+		while (NULL != schemes[c].title)
+		{
+			if (!strncmp (schemes[c].title, title, strnlen (schemes[c].title, 20)))
+			{
+				r = &schemes[c];
+				break;
+			}
+			c++;
+		}
+	}
+
+	return r;
+}
+
+
+/**
  * Name under which this program was invoked.
  */
 const char *exec_name;
 
-
-const char * (*theme) [2];
 
 void
 print_version (FILE *stream, struct argp_state *state)
@@ -123,19 +210,75 @@ const char *argp_program_bug_address = AUTHOR_MAIL;
 static const char doc[] = N_(APP_NAME " - display current time in a qlocktwo \
 like fashion.");
 
+/**
+ * Options we process.
+ */
+static struct argp_option options[] = {
+	{
+		"color-scheme",
+		's',
+		"SCHEME",
+		/* OPTION_ARG_OPTIONAL, */
+		0,
+		"Select color scheme to be used for displaying time. \
+Color schemes supported at this moment are: 'light', 'mid', 'dark'. Default \
+color scheme is 'dark'."
+	},
+	{NULL}
+};
 
-static struct argp argp = {0, 0, 0, doc};
+/**
+ * Used by main to communicate with parse_opt.
+ */
+struct arguments
+{
+	char *scheme_title;
+};
+
+/**
+ * Parse a single option.
+ */
+static error_t
+parse_opt (int key, char *arg, struct argp_state *state)
+{
+	/**
+	 * Get the input argument from argp_parse, which we know is a pointer to our
+	 * arguments structure.
+	 */
+	struct arguments *arguments = state->input;
+	
+	switch (key)
+		{
+		case 's':
+			if (!validate_scheme_title (arg))
+				argp_usage (state);
+			arguments->scheme_title = arg;
+			break;
+		
+		default:
+			return ARGP_ERR_UNKNOWN;
+		}
+
+	return 0;
+}
+
+/**
+ * Our argp parser.
+ */
+static struct argp argp = {options, parse_opt, NULL, doc};
 
 
 
-
+/**
+ * Clock display switch functions.
+ */
 const char *
 isAM (const struct tm * ct)
 {
-	const char * r = (*theme) [1];
+	const char * r = scheme->frgrnd;
 	if (12 > ct->tm_hour)
 	{
-		r = (*theme) [0];
+		r = scheme->accent;
 	}
 
 	return r;
@@ -144,10 +287,22 @@ isAM (const struct tm * ct)
 const char *
 isPM (const struct tm * ct)
 {
-	const char * r = (*theme) [1];
+	const char * r = scheme->frgrnd;
 	if (12 <= ct->tm_hour)
 	{
-		r = (*theme) [0];
+		r = scheme->accent;
+	}
+
+	return r;
+}
+
+const char *
+isOclock (const struct tm * ct)
+{
+	const char * r = scheme->frgrnd;
+	if (0 <= ct->tm_min && 5 > ct->tm_min)
+	{
+		r = scheme->accent;
 	}
 
 	return r;
@@ -156,10 +311,10 @@ isPM (const struct tm * ct)
 const char *
 isPast (const struct tm * ct)
 {
-	const char * r = (*theme) [1];
-	if (30 >= ct->tm_min)
+	const char * r = scheme->frgrnd;
+	if (34 >= ct->tm_min && 5 <= ct->tm_min)
 	{
-		r = (*theme) [0];
+		r = scheme->accent;
 	}
 
 	return r;
@@ -168,10 +323,10 @@ isPast (const struct tm * ct)
 const char *
 isTo (const struct tm * ct)
 {
-	const char * r = (*theme) [1];
-	if (30 < ct->tm_min)
+	const char * r = scheme->frgrnd;
+	if (34 < ct->tm_min)
 	{
-		r = (*theme) [0];
+		r = scheme->accent;
 	}
 
 	return r;
@@ -180,13 +335,13 @@ isTo (const struct tm * ct)
 const char *
 isFiveMin (const struct tm * ct)
 {
-	const char * r = (*theme) [1];
+	const char * r = scheme->frgrnd;
 	if ((5 <= ct->tm_min && 10 > ct->tm_min) ||
 		(25 <= ct->tm_min && 30 > ct->tm_min) ||
 		(35 <= ct->tm_min && 40 > ct->tm_min) ||
 		(55 <= ct->tm_min))
 	{
-		r = (*theme) [0];
+		r = scheme->accent;
 	}
 
 	return r;
@@ -195,11 +350,11 @@ isFiveMin (const struct tm * ct)
 const char *
 isTenMin (const struct tm * ct)
 {
-	const char * r = (*theme) [1];
+	const char * r = scheme->frgrnd;
 	if ((10 <= ct->tm_min && 15 > ct->tm_min) ||
 		(50 <= ct->tm_min && 55 > ct->tm_min))
 	{
-		r = (*theme) [0];
+		r = scheme->accent;
 	}
 
 	return r;
@@ -208,11 +363,11 @@ isTenMin (const struct tm * ct)
 const char *
 isQuarter (const struct tm * ct)
 {
-	const char * r = (*theme) [1];
+	const char * r = scheme->frgrnd;
 	if ((15 <= ct->tm_min && 20 > ct->tm_min) ||
 		(45 <= ct->tm_min && 50 > ct->tm_min))
 	{
-		r = (*theme) [0];
+		r = scheme->accent;
 	}
 
 	return r;
@@ -221,11 +376,11 @@ isQuarter (const struct tm * ct)
 const char *
 isTwentyMin (const struct tm * ct)
 {
-	const char * r = (*theme) [1];
+	const char * r = scheme->frgrnd;
 	if ((20 <= ct->tm_min && 30 > ct->tm_min) ||
 		(35 <= ct->tm_min && 45 > ct->tm_min))
 	{
-		r = (*theme) [0];
+		r = scheme->accent;
 	}
 
 	return r;
@@ -234,10 +389,10 @@ isTwentyMin (const struct tm * ct)
 const char *
 isThirtyMin (const struct tm * ct)
 {
-	const char * r = (*theme) [1];
+	const char * r = scheme->frgrnd;
 	if (30 <= ct->tm_min && 35 > ct->tm_min)
 	{
-		r = (*theme) [0];
+		r = scheme->accent;
 	}
 
 	return r;
@@ -246,11 +401,18 @@ isThirtyMin (const struct tm * ct)
 const char *
 isHour (const struct tm * ct, int hr)
 {
-	const char * r = (*theme) [1];
+	const char * r = scheme->frgrnd;
+
+	/*
 	if ((hr <= ct->tm_hour && (hr + 1) > ct->tm_hour) ||
 		((hr + 12) <= ct->tm_hour && (hr + 13) > ct->tm_hour))
+	*/
+	if ((((hr == ct->tm_hour) || ((12 == hr ? hr - 12 : hr + 12) == ct->tm_hour)) &&
+		 (0 <= ct->tm_min && 34 >= ct->tm_min)) ||
+		((((hr - 1) == ct->tm_hour) || ((hr + 11) == ct->tm_hour)) &&
+		 (34 < ct->tm_min && 59 >= ct->tm_min)))
 	{
-		r = (*theme) [0];
+		r = scheme->accent;
 	}
 
 	return r;
@@ -267,7 +429,6 @@ main (int argc, char **argv)
 	bind_textdomain_codeset (PACKAGE, "utf-8");
 	textdomain (PACKAGE);
 
-	argp_parse (&argp, argc, argv, 0, 0, 0);
 
 	/**
 	 * Construct the name of the executable, without the directory part.
@@ -280,47 +441,64 @@ main (int argc, char **argv)
 	else
 		++exec_name;
 
+
+	/**
+	 * Parse options.
+	 */
+	struct arguments arguments;
+
+	argp_parse (&argp, argc, argv, 0, 0, &arguments);
+
+
+	/**
+	 * Define color schemes.
+	 */
+	/*
 	const char *light[] = {COLOR_BLACK, COLOR_DIM_WHITE};
 	const char *mid[]   = {COLOR_DARK_WHITE, COLOR_LIGHT_GRAY};
 	const char *dark[]  = {COLOR_WHITE, COLOR_DARK_GRAY};
 	const char reset[] = COLOR_RESET;
+	*/
+
 
 	struct tm *current_clock;
 	time_t simple_clock;
 
-	theme = &dark;
+
+	/* scheme = &schemes[2]; */
+	scheme = scheme_by_title (arguments.scheme_title);
 	simple_clock = time (NULL);
 	current_clock = localtime (&simple_clock);
 
 	printf ("\n\n");
 	printf (_("\t%sI  T  %sL  %sI  S  %sB  F  %sA  M  %sP  M%s\n"),
-		(*theme) [0],
-		(*theme) [1],
-		(*theme) [0],
-		(*theme) [1],
+		scheme->accent,
+		scheme->frgrnd,
+		scheme->accent,
+		scheme->frgrnd,
 		isAM (current_clock),
 		isPM (current_clock),
 		reset);
 	printf (_("\t%sA  C  %sQ  U  A  R  T  E  R  %sD  C%s\n"),
-		(*theme) [1],
+		scheme->frgrnd,
 		isQuarter (current_clock),
-		(*theme) [1],
+		scheme->frgrnd,
 		reset);
 	printf (_("\t%sT  W  E  N  T  Y  %sF  I  V  E  %sX%s\n"),
 		isTwentyMin (current_clock),
 		isFiveMin (current_clock),
-		(*theme) [1],
+		scheme->frgrnd,
 		reset);
 	printf (_("\t%sH  A  L  F  %sB  %sT  E  N  %sF  %sT  O%s\n"),
 		isThirtyMin (current_clock),
-		(*theme) [1],
+		scheme->frgrnd,
 		isTenMin (current_clock),
-		(*theme) [1],
+		scheme->frgrnd,
 		isTo (current_clock),
 		reset);
 	printf (_("\t%sP  A  S  T  %sE  R  U  %sN  I  N  E%s\n"),
 		isPast (current_clock),
-		(*theme) [1],
+		scheme->frgrnd,
 		isHour (current_clock, 9),
 		reset);
 	printf (_("\t%sO  N  E  %sS  I  X  %sT  H  R  E  E%s\n"),
@@ -339,11 +517,12 @@ main (int argc, char **argv)
 		reset);
 	printf (_("\t%sS  E  V  E  N  %sT  W  E  L  V  E%s\n"),
 		isHour (current_clock, 7),
-		isHour (current_clock, 0),
+		isHour (current_clock, 12),
 		reset);
-	printf (_("\t%sT  E  N  %sS  E  O' C  L  O  C  K%s\n"),
+	printf (_("\t%sT  E  N  %sS  E  %sO' C  L  O  C  K%s\n"),
 		isHour (current_clock, 10),
-		(*theme) [1],
+		scheme->frgrnd,
+		isOclock (current_clock),
 		reset);
 	printf ("\n\n\n");
 
