@@ -83,15 +83,21 @@
 
 
 /**
+ * Maximum scheme title length must not exceed 20 chars.
+ */
+#define CQLOCK_TITLE_LNGT 20
+
+
+/**
  * ANSI color escape codes.
  */
-#define COLOR_WHITE      "\x1b[38;5;255m"
-#define COLOR_DIM_WHITE  "\x1b[38;5;253m"
-#define COLOR_DARK_WHITE "\x1b[38;5;245m"
-#define COLOR_LIGHT_GRAY "\x1b[38;5;237m"
-#define COLOR_DARK_GRAY  "\x1b[38;5;235m"
-#define COLOR_BLACK      "\x1b[38;5;0m"
-#define COLOR_RESET      "\x1b[0m"
+#define CQLOCK_COLOR_WHITE      "\x1b[38;5;255m"
+#define CQLOCK_COLOR_DIM_WHITE  "\x1b[38;5;253m"
+#define CQLOCK_COLOR_DARK_WHITE "\x1b[38;5;245m"
+#define CQLOCK_COLOR_LIGHT_GRAY "\x1b[38;5;237m"
+#define CQLOCK_COLOR_DARK_GRAY  "\x1b[38;5;235m"
+#define CQLOCK_COLOR_BLACK      "\x1b[38;5;0m"
+#define CQLOCK_COLOR_RESET      "\x1b[0m"
 
 
 /**
@@ -99,81 +105,108 @@
  */
 typedef struct
 {
-	const char *title;
-	const char *accent;
-	const char *frgrnd;
-	const char *bkgrnd;
+	const char *title;  /* scheme title */
+	const char *accent; /* color escape code for accented characters */
+	const char *frgrnd; /* color escape code for unaccented characters */
+	const char *bkgrnd; /* color escape code for background
+			       (not enabled yet) */
 } ColorScheme;
 
 /**
- * Define color schemes. Title must not be longer than 20 characters.
+ * Define color schemes. Title must not be longer than 20 characters and it also
+ * must be unique. It should be good to keep schemes sorted ascending by title,
+ * too.
  */
 static ColorScheme schemes[] = {
 	{
 		.title = "light",
-		.accent = COLOR_BLACK,
-		.frgrnd = COLOR_DIM_WHITE,
-		.bkgrnd = COLOR_WHITE
+		.accent = CQLOCK_COLOR_BLACK,
+		.frgrnd = CQLOCK_COLOR_DIM_WHITE,
+		.bkgrnd = CQLOCK_COLOR_WHITE
 	},
 	{
 		.title = "mid",
-		.accent = COLOR_DARK_WHITE,
-		.frgrnd = COLOR_LIGHT_GRAY,
-		.bkgrnd = COLOR_DARK_GRAY
+		.accent = CQLOCK_COLOR_DARK_WHITE,
+		.frgrnd = CQLOCK_COLOR_LIGHT_GRAY,
+		.bkgrnd = CQLOCK_COLOR_DARK_GRAY
 	},
 	{
 		.title = "dark",
-		.accent = COLOR_WHITE,
-		.frgrnd = COLOR_DARK_GRAY,
-		.bkgrnd = COLOR_BLACK
+		.accent = CQLOCK_COLOR_WHITE,
+		.frgrnd = CQLOCK_COLOR_DARK_GRAY,
+		.bkgrnd = CQLOCK_COLOR_BLACK
 	},
 	{NULL}
 };
 
 /**
- * Points to scheme being used.
+ * Color reset sequence;
+ */
+const char reset[] = CQLOCK_COLOR_RESET;
+
+/**
+ * Pointer to scheme being used.
  */
 static ColorScheme *scheme;
 
 /**
- * Color reset sequence;
- */
-const char reset[] = COLOR_RESET;
-
-/**
- * validate_scheme_title - Validate if given string is title for one of
- * predefined color schemes.
+ * validate_scheme_title:
+ * @title: title to search for in @schemes array
+ *
+ * It searches @schemes array for first occurrence of scheme with given title.
+ * NULL is handled gracefully.
+ *
+ * Returns: 1 if given string corresponds to one of titles in the @schemes
+ * array. Else it returns 0.
  */
 static unsigned short validate_scheme_title (const char *title)
 {
 	unsigned int c = 0;
+	unsigned int r = 0;
 
 	if (NULL != title)
 	{
 		while (NULL != schemes[c].title)
 		{
-			if (!strncmp (schemes[c].title, title, strnlen (schemes[c].title, 20)))
-				return 1;
+			if (!strncmp (schemes[c].title,
+				title,
+				strnlen (schemes[c].title, CQLOCK_TITLE_LNGT)))
+			{
+				r = 1;
+				break; /* No need to search more, so bail out. */
+			}
 			c++;
 		}
 	}
 
-	return 0;
+	return r;
 }
 
+/**
+ * scheme_by_title:
+ * @title: title to select scheme by
+ *
+ * It searches @schemes array for first occurrence of scheme with given title.
+ * NULL is handled gracefully.
+ *
+ * Returns: pointer to scheme with given title if such exists. Else it returns
+ * pointer to default scheme.
+ */
 static ColorScheme *scheme_by_title (const char *title)
 {
-	ColorScheme *r = &schemes[2];
+	ColorScheme *r = &schemes[2]; /* Assign default scheme. */
 	unsigned int c = 0;
 
 	if (NULL != title)
 	{
 		while (NULL != schemes[c].title)
 		{
-			if (!strncmp (schemes[c].title, title, strnlen (schemes[c].title, 20)))
+			if (!strncmp (schemes[c].title,
+				title,
+				strnlen (schemes[c].title, CQLOCK_TITLE_LNGT)))
 			{
 				r = &schemes[c];
-				break;
+				break; /* No need to search more, so bail out. */
 			}
 			c++;
 		}
@@ -189,6 +222,14 @@ static ColorScheme *scheme_by_title (const char *title)
 const char *exec_name;
 
 
+/**
+ * print_version:
+ * @stream: FILE pointer to stream to output version message to
+ * @state: pointer to a struct argp_state, which contains information about the
+ *         state of the option parsing
+ *
+ * Prints application's version information to @stream.
+ */
 void
 print_version (FILE *stream, struct argp_state *state)
 {
@@ -211,14 +252,13 @@ static const char doc[] = N_(APP_NAME " - display current time in a qlocktwo \
 like fashion.");
 
 /**
- * Options we process.
+ * Define options to process.
  */
 static struct argp_option options[] = {
 	{
 		"color-scheme",
 		's',
 		"SCHEME",
-		/* OPTION_ARG_OPTIONAL, */
 		0,
 		"Select color scheme to be used for displaying time. \
 Color schemes supported at this moment are: 'light', 'mid', 'dark'. Default \
@@ -236,14 +276,23 @@ struct arguments
 };
 
 /**
- * Parse a single option.
+ * parse_opt:
+ * @key: key of an option to process
+ * @arg: given value of an option to process
+ * @state: state points to a struct argp_state, containing useful information
+ *         about the current parsing state for use by parser
+ *
+ * Parses a single option.
+ *
+ * Returns: 0 for success, ARGP_ERR_UNKNOWN if the value of key is not handled
+ * by this parser function.
  */
 static error_t
 parse_opt (int key, char *arg, struct argp_state *state)
 {
 	/**
-	 * Get the input argument from argp_parse, which we know is a pointer to our
-	 * arguments structure.
+	 * Get the input argument from argp_parse, which we know is a pointer to
+	 * our arguments structure.
 	 */
 	struct arguments *arguments = state->input;
 	
@@ -270,10 +319,22 @@ static struct argp argp = {options, parse_opt, NULL, doc};
 
 
 /**
- * Clock display switch functions.
+ * Light on functions for displaying time.
+ */
+
+/**
+ * light_am:
+ * @ct: pointer to struct tm containing current time information
+ * @scheme: pointer to color scheme to use for displaying data
+ *
+ * Turns "AM" on clock display by sending correct color escape string to output
+ * function.
+ *
+ * Returns: pointer to constant string containing color escape sequence for
+ * lighting up "AM" on clock display.
  */
 const char *
-isAM (const struct tm * ct)
+light_am (const struct tm * ct, const ColorScheme *scheme)
 {
 	const char * r = scheme->frgrnd;
 	if (12 > ct->tm_hour)
@@ -284,8 +345,19 @@ isAM (const struct tm * ct)
 	return r;
 }
 
+/**
+ * light_pm:
+ * @ct: pointer to struct tm containing current time information
+ * @scheme: pointer to color scheme to use for displaying data
+ *
+ * Turns "PM" on clock display by sending correct color escape string to output
+ * function.
+ *
+ * Returns: pointer to constant string containing color escape sequence for
+ * lighting up "PM" on clock display.
+ */
 const char *
-isPM (const struct tm * ct)
+light_pm (const struct tm * ct, const ColorScheme *scheme)
 {
 	const char * r = scheme->frgrnd;
 	if (12 <= ct->tm_hour)
@@ -296,8 +368,19 @@ isPM (const struct tm * ct)
 	return r;
 }
 
+/**
+ * light_oclock:
+ * @ct: pointer to struct tm containing current time information
+ * @scheme: pointer to color scheme to use for displaying data
+ *
+ * Turns "O'CLOCK" on clock display by sending correct color escape string to
+ * output function.
+ *
+ * Returns: pointer to constant string containing color escape sequence for
+ * lighting up "O'CLOCK" on clock display.
+ */
 const char *
-isOclock (const struct tm * ct)
+light_oclock (const struct tm * ct, const ColorScheme *scheme)
 {
 	const char * r = scheme->frgrnd;
 	if (0 <= ct->tm_min && 5 > ct->tm_min)
@@ -308,8 +391,19 @@ isOclock (const struct tm * ct)
 	return r;
 }
 
+/**
+ * light_past:
+ * @ct: pointer to struct tm containing current time information
+ * @scheme: pointer to color scheme to use for displaying data
+ *
+ * Turns "PAST" on clock display by sending correct color escape string to
+ * output function.
+ *
+ * Returns: pointer to constant string containing color escape sequence for
+ * lighting up "PAST" on clock display.
+ */
 const char *
-isPast (const struct tm * ct)
+light_past (const struct tm * ct, const ColorScheme *scheme)
 {
 	const char * r = scheme->frgrnd;
 	if (34 >= ct->tm_min && 5 <= ct->tm_min)
@@ -320,8 +414,20 @@ isPast (const struct tm * ct)
 	return r;
 }
 
+
+/**
+ * light_to:
+ * @ct: pointer to struct tm containing current time information
+ * @scheme: pointer to color scheme to use for displaying data
+ *
+ * Turns "TO" on clock display by sending correct color escape string to
+ * output function.
+ *
+ * Returns: pointer to constant string containing color escape sequence for
+ * lighting up "TO" on clock display.
+ */
 const char *
-isTo (const struct tm * ct)
+light_to (const struct tm * ct, const ColorScheme *scheme)
 {
 	const char * r = scheme->frgrnd;
 	if (34 < ct->tm_min)
@@ -332,8 +438,19 @@ isTo (const struct tm * ct)
 	return r;
 }
 
+/**
+ * light_five_min:
+ * @ct: pointer to struct tm containing current time information
+ * @scheme: pointer to color scheme to use for displaying data
+ *
+ * Turns "FIVE" minutes on clock display by sending correct color escape string
+ * to output function.
+ *
+ * Returns: pointer to constant string containing color escape sequence for
+ * lighting up "FIVE" minutes on clock display.
+ */
 const char *
-isFiveMin (const struct tm * ct)
+light_five_min (const struct tm * ct, const ColorScheme *scheme)
 {
 	const char * r = scheme->frgrnd;
 	if ((5 <= ct->tm_min && 10 > ct->tm_min) ||
@@ -347,8 +464,19 @@ isFiveMin (const struct tm * ct)
 	return r;
 }
 
+/**
+ * light_ten_min:
+ * @ct: pointer to struct tm containing current time information
+ * @scheme: pointer to color scheme to use for displaying data
+ *
+ * Turns "TEN" minutes on clock display by sending correct color escape string
+ * to output function.
+ *
+ * Returns: pointer to constant string containing color escape sequence for
+ * lighting up "TEN" minutes on clock display.
+ */
 const char *
-isTenMin (const struct tm * ct)
+light_ten_min (const struct tm * ct, const ColorScheme *scheme)
 {
 	const char * r = scheme->frgrnd;
 	if ((10 <= ct->tm_min && 15 > ct->tm_min) ||
@@ -360,8 +488,19 @@ isTenMin (const struct tm * ct)
 	return r;
 }
 
+/**
+ * light_quarter:
+ * @ct: pointer to struct tm containing current time information
+ * @scheme: pointer to color scheme to use for displaying data
+ *
+ * Turns "QUARTER" on clock display by sending correct color escape string
+ * to output function.
+ *
+ * Returns: pointer to constant string containing color escape sequence for
+ * lighting up "QUARTER" minutes on clock display.
+ */
 const char *
-isQuarter (const struct tm * ct)
+light_quarter (const struct tm * ct, const ColorScheme *scheme)
 {
 	const char * r = scheme->frgrnd;
 	if ((15 <= ct->tm_min && 20 > ct->tm_min) ||
@@ -373,8 +512,19 @@ isQuarter (const struct tm * ct)
 	return r;
 }
 
+/**
+ * light_twenty_min:
+ * @ct: pointer to struct tm containing current time information
+ * @scheme: pointer to color scheme to use for displaying data
+ *
+ * Turns "TWENTY" minutes on clock display by sending correct color escape string
+ * to output function.
+ *
+ * Returns: pointer to constant string containing color escape sequence for
+ * lighting up "TWENTY" minutes on clock display.
+ */
 const char *
-isTwentyMin (const struct tm * ct)
+light_twenty_min (const struct tm * ct, const ColorScheme *scheme)
 {
 	const char * r = scheme->frgrnd;
 	if ((20 <= ct->tm_min && 30 > ct->tm_min) ||
@@ -386,8 +536,19 @@ isTwentyMin (const struct tm * ct)
 	return r;
 }
 
+/**
+ * light_half_hour:
+ * @ct: pointer to struct tm containing current time information
+ * @scheme: pointer to color scheme to use for displaying data
+ *
+ * Turns "HALF" on clock display by sending correct color escape string
+ * to output function.
+ *
+ * Returns: pointer to constant string containing color escape sequence for
+ * lighting up "HALF" hour on clock display.
+ */
 const char *
-isThirtyMin (const struct tm * ct)
+light_half_hour (const struct tm * ct, const ColorScheme *scheme)
 {
 	const char * r = scheme->frgrnd;
 	if (30 <= ct->tm_min && 35 > ct->tm_min)
@@ -398,15 +559,23 @@ isThirtyMin (const struct tm * ct)
 	return r;
 }
 
+/**
+ * light_hour:
+ * @ct: pointer to struct tm containing current time information
+ * @hr: which hour to test for
+ * @scheme: pointer to color scheme to use for displaying data
+ *
+ * Turns given hour, if correct, on clock display by sending correct color
+ * escape string to output function.
+ *
+ * Returns: pointer to constant string containing color escape sequence for
+ * lighting up given hour on clock display.
+ */
 const char *
-isHour (const struct tm * ct, int hr)
+light_hour (const struct tm * ct, int hr, const ColorScheme *scheme)
 {
 	const char * r = scheme->frgrnd;
 
-	/*
-	if ((hr <= ct->tm_hour && (hr + 1) > ct->tm_hour) ||
-		((hr + 12) <= ct->tm_hour && (hr + 13) > ct->tm_hour))
-	*/
 	if ((((hr == ct->tm_hour) || ((12 == hr ? hr - 12 : hr + 12) == ct->tm_hour)) &&
 		 (0 <= ct->tm_min && 34 >= ct->tm_min)) ||
 		((((hr - 1) == ct->tm_hour) || ((hr + 11) == ct->tm_hour)) &&
@@ -450,17 +619,6 @@ main (int argc, char **argv)
 	argp_parse (&argp, argc, argv, 0, 0, &arguments);
 
 
-	/**
-	 * Define color schemes.
-	 */
-	/*
-	const char *light[] = {COLOR_BLACK, COLOR_DIM_WHITE};
-	const char *mid[]   = {COLOR_DARK_WHITE, COLOR_LIGHT_GRAY};
-	const char *dark[]  = {COLOR_WHITE, COLOR_DARK_GRAY};
-	const char reset[] = COLOR_RESET;
-	*/
-
-
 	struct tm *current_clock;
 	time_t simple_clock;
 
@@ -476,53 +634,53 @@ main (int argc, char **argv)
 		scheme->frgrnd,
 		scheme->accent,
 		scheme->frgrnd,
-		isAM (current_clock),
-		isPM (current_clock),
+		light_am (current_clock, scheme),
+		light_pm (current_clock, scheme),
 		reset);
 	printf (_("\t%sA  C  %sQ  U  A  R  T  E  R  %sD  C%s\n"),
 		scheme->frgrnd,
-		isQuarter (current_clock),
+		light_quarter (current_clock, scheme),
 		scheme->frgrnd,
 		reset);
 	printf (_("\t%sT  W  E  N  T  Y  %sF  I  V  E  %sX%s\n"),
-		isTwentyMin (current_clock),
-		isFiveMin (current_clock),
+		light_twenty_min (current_clock, scheme),
+		light_five_min (current_clock, scheme),
 		scheme->frgrnd,
 		reset);
 	printf (_("\t%sH  A  L  F  %sB  %sT  E  N  %sF  %sT  O%s\n"),
-		isThirtyMin (current_clock),
+		light_half_hour (current_clock, scheme),
 		scheme->frgrnd,
-		isTenMin (current_clock),
+		light_ten_min (current_clock, scheme),
 		scheme->frgrnd,
-		isTo (current_clock),
+		light_to (current_clock, scheme),
 		reset);
 	printf (_("\t%sP  A  S  T  %sE  R  U  %sN  I  N  E%s\n"),
-		isPast (current_clock),
+		light_past (current_clock, scheme),
 		scheme->frgrnd,
-		isHour (current_clock, 9),
+		light_hour (current_clock, 9, scheme),
 		reset);
 	printf (_("\t%sO  N  E  %sS  I  X  %sT  H  R  E  E%s\n"),
-		isHour (current_clock, 1),
-		isHour (current_clock, 6),
-		isHour (current_clock, 3),
+		light_hour (current_clock, 1, scheme),
+		light_hour (current_clock, 6, scheme),
+		light_hour (current_clock, 3, scheme),
 		reset);
 	printf (_("\t%sF  O  U  R  %sF  I  V  E  %sT  W  O%s\n"),
-		isHour (current_clock, 4),
-		isHour (current_clock, 5),
-		isHour (current_clock, 2),
+		light_hour (current_clock, 4, scheme),
+		light_hour (current_clock, 5, scheme),
+		light_hour (current_clock, 2, scheme),
 		reset);
 	printf (_("\t%sE  I  G  H  T  %sE  L  E  V  E  N%s\n"),
-		isHour (current_clock, 8),
-		isHour (current_clock, 11),
+		light_hour (current_clock, 8, scheme),
+		light_hour (current_clock, 11, scheme),
 		reset);
 	printf (_("\t%sS  E  V  E  N  %sT  W  E  L  V  E%s\n"),
-		isHour (current_clock, 7),
-		isHour (current_clock, 12),
+		light_hour (current_clock, 7, scheme),
+		light_hour (current_clock, 12, scheme),
 		reset);
 	printf (_("\t%sT  E  N  %sS  E  %sO' C  L  O  C  K%s\n"),
-		isHour (current_clock, 10),
+		light_hour (current_clock, 10, scheme),
 		scheme->frgrnd,
-		isOclock (current_clock),
+		light_oclock (current_clock, scheme),
 		reset);
 	printf ("\n\n\n");
 

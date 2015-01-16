@@ -133,7 +133,7 @@ cqlock.ppc : cqlock.c
 # Cleanup section.
 #
 clean :
-	rm -v ./*.o ./*~
+	rm -v ./*.o ./.*~ ./*~
 
 cleanall :
-	rm -v $(foreach TARGET,$(TARGETS),./$(TARGET)) ./*.o ./*~ ./*.ppc ./*.pot
+	rm -v $(foreach TARGET,$(TARGETS),./$(TARGET)) ./*.o ./.*~ ./*~ ./*.ppc ./*.pot
