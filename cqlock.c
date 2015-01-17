@@ -17,9 +17,9 @@
 /*
  * Terminal application to display current time in the qlocktwo fashion. It is C
  * implementation of script written for conky (http://pastebin.com/wK7JmG9H).
- * Mid (midtone) color scheme was inspired by solarized color scheme
- * (http://ethanschoonover.com/solarized) so it is best used with background
- * color #002B36.
+ * Color schemes were inspired by solarized color scheme
+ * (http://ethanschoonover.com/solarized). Mid color scheme is best used with
+ * background color #002B36.
  *
  * 2015-01-10 Ljubomir Kurij <kurijlj@gmail.com>
  *
@@ -89,27 +89,18 @@
 
 
 /**
- * ANSI color escape codes.
- */
-#define CQLOCK_COLOR_WHITE      "\x1b[38;5;255m"
-#define CQLOCK_COLOR_DIM_WHITE  "\x1b[38;5;253m"
-#define CQLOCK_COLOR_DARK_WHITE "\x1b[38;5;245m"
-#define CQLOCK_COLOR_LIGHT_GRAY "\x1b[38;5;237m"
-#define CQLOCK_COLOR_DARK_GRAY  "\x1b[38;5;235m"
-#define CQLOCK_COLOR_BLACK      "\x1b[38;5;0m"
-#define CQLOCK_COLOR_RESET      "\x1b[0m"
-
-
-/**
  * scheme - Structure to hold color scheme information.
  */
 typedef struct
 {
-	const char *title;  /* scheme title */
-	const char *accent; /* color escape code for accented characters */
-	const char *frgrnd; /* color escape code for unaccented characters */
-	const char *bkgrnd; /* color escape code for background
-			       (not enabled yet) */
+	const char *title;       /* scheme title */
+	const char *description; /* string that describes given color scheme
+				    more closely or holds notes for using
+				    scheme. Used when displaying schemes list. */
+	const char *accent;      /* color escape code for accented characters */
+	const char *frgrnd;      /* color escape code for unaccented characters */
+	const char *bkgrnd;      /* color escape code for background
+				    (not enabled yet) */
 } ColorScheme;
 
 /**
@@ -119,22 +110,52 @@ typedef struct
  */
 static ColorScheme schemes[] = {
 	{
-		.title = "light",
-		.accent = CQLOCK_COLOR_BLACK,
-		.frgrnd = CQLOCK_COLOR_DIM_WHITE,
-		.bkgrnd = CQLOCK_COLOR_WHITE
+		.title = "light-low",
+		.description = N_("Best used on terminals that support only basic \
+set of\n\t\tcolor codes."),
+		.accent = "\x1b[1;34m",
+		.frgrnd = "\x1b[1;30m",
+		.bkgrnd = "\x1b[0;47m"
 	},
 	{
-		.title = "mid",
-		.accent = CQLOCK_COLOR_DARK_WHITE,
-		.frgrnd = CQLOCK_COLOR_LIGHT_GRAY,
-		.bkgrnd = CQLOCK_COLOR_DARK_GRAY
+		.title = "mid-low",
+		.description = N_("Best used on terminals that support only basic \
+set of\n\t\tcolor codes."),
+		.accent = "\x1b[1;36m",
+		.frgrnd = "\x1b[0;37m",
+		.bkgrnd = "\x1b[0;46m"
 	},
 	{
-		.title = "dark",
-		.accent = CQLOCK_COLOR_WHITE,
-		.frgrnd = CQLOCK_COLOR_DARK_GRAY,
-		.bkgrnd = CQLOCK_COLOR_BLACK
+		.title = "dark-low",
+		.description = N_("Best used on terminals that support only basic \
+set of\n\t\tcolor codes."),
+		.accent = "\x1b[1;37m",
+		.frgrnd = "\x1b[1;30m",
+		.bkgrnd = "\x1b[0;40m"
+	},
+	{
+		.title = "light-high",
+		.description = N_("Best used on terminals that support extended \
+set of\n\t\tcolor codes."),
+		.accent = "\x1b[38;5;33m",
+		.frgrnd = "\x1b[38;5;250m",
+		.bkgrnd = "\x1b[38;5;230m"
+	},
+	{
+		.title = "mid-high",
+		.description = N_("Best used on terminals that support extended \
+set of\n\t\tcolor codes."),
+		.accent = "\x1b[38;5;33m",
+		.frgrnd = "\x1b[38;5;240m",
+		.bkgrnd = "\x1b[38;5;234m"
+	},
+	{
+		.title = "dark-high",
+		.description = N_("Best used on terminals that support extended \
+set of\n\t\tcolor codes."),
+		.accent = "\x1b[38;5;255m",
+		.frgrnd = "\x1b[38;5;235m",
+		.bkgrnd = "\x1b[38;5;0m"
 	},
 	{NULL}
 };
@@ -142,7 +163,7 @@ static ColorScheme schemes[] = {
 /**
  * Color reset sequence;
  */
-const char reset[] = CQLOCK_COLOR_RESET;
+const char reset[] = "\x1b[0m";
 
 /**
  * Pointer to scheme being used.
@@ -159,7 +180,8 @@ static ColorScheme *scheme;
  * Returns: 1 if given string corresponds to one of titles in the @schemes
  * array. Else it returns 0.
  */
-static unsigned short validate_scheme_title (const char *title)
+static unsigned short
+validate_scheme_title (const char *title)
 {
 	unsigned int c = 0;
 	unsigned int r = 0;
@@ -192,7 +214,8 @@ static unsigned short validate_scheme_title (const char *title)
  * Returns: pointer to scheme with given title if such exists. Else it returns
  * pointer to default scheme.
  */
-static ColorScheme *scheme_by_title (const char *title)
+static ColorScheme *
+scheme_by_title (const char *title)
 {
 	ColorScheme *r = &schemes[2]; /* Assign default scheme. */
 	unsigned int c = 0;
@@ -213,6 +236,29 @@ static ColorScheme *scheme_by_title (const char *title)
 	}
 
 	return r;
+}
+
+/**
+ * list_color_schemes:
+ *
+ * Prints list of supported color schemes to stdout.
+ */
+static void
+list_color_schemes ()
+{
+	unsigned int c = 0;
+
+	printf (" scheme\t\tdescription\n");
+	printf (" ==========\
+\t=====================================================\n");
+
+	while (NULL != schemes[c].title)
+	{
+		printf (" %s\t%s\n", schemes[c].title, schemes[c].description);
+		c++;
+	}
+
+	printf ("\n");
 }
 
 
@@ -256,13 +302,20 @@ like fashion.");
  */
 static struct argp_option options[] = {
 	{
+		"list-schemes",
+		'l',
+		NULL,
+		OPTION_ARG_OPTIONAL,
+		N_("Display list of supported color schemes.")
+	},
+	{
 		"color-scheme",
 		's',
-		"SCHEME",
+		N_("SCHEME"),
 		0,
-		"Select color scheme to be used for displaying time. \
-Color schemes supported at this moment are: 'light', 'mid', 'dark'. Default \
-color scheme is 'dark'."
+		N_("Select color scheme to be used for displaying time. For full \
+list of supported color schemes run application with -l option. Default color \
+scheme is dark-low.")
 	},
 	{NULL}
 };
@@ -272,6 +325,7 @@ color scheme is 'dark'."
  */
 struct arguments
 {
+	unsigned int list_schemes;
 	char *scheme_title;
 };
 
@@ -298,6 +352,9 @@ parse_opt (int key, char *arg, struct argp_state *state)
 	
 	switch (key)
 		{
+		case 'l':
+			arguments->list_schemes = 1;
+			break;
 		case 's':
 			if (!validate_scheme_title (arg))
 				argp_usage (state);
@@ -615,9 +672,18 @@ main (int argc, char **argv)
 	 * Parse options.
 	 */
 	struct arguments arguments;
+	arguments.list_schemes = 0; /* Default is FALSE (don't list schemes). */
 
 	argp_parse (&argp, argc, argv, 0, 0, &arguments);
 
+	/* If users selected display schemes option, display list of color
+	 * schemes and bail out.
+	 */
+	if (arguments.list_schemes)
+	{
+		list_color_schemes ();
+		exit (EXIT_SUCCESS);
+	}
 
 	struct tm *current_clock;
 	time_t simple_clock;
