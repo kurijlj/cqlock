@@ -10,9 +10,8 @@ three color schemes for displaying data. Color schemes were inspired by
 
 Screenshots
 ===========
-![xfce terminal emulator mid-high](./screenshots/xfce_terminal_emulator_mid-high.png)
-
 Xfce terminal emulator, color scheme: mid-high.
+![xfce terminal emulator mid-high](./screenshots/xfce_terminal_emulator_mid-high.png)
 
 
 ![xfce terminal emulator dark-high](./screenshots/xfce_terminal_emulator_dark-high.png)
