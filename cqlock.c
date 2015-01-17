@@ -15,8 +15,10 @@
  */
 
 /*
- * Terminal application to display current time in the qlocktwo fashion. It is C
- * implementation of script written for conky (http://pastebin.com/wK7JmG9H).
+ * Terminal application that displays current time in the qlocktwo fashion.
+ * It is C implementation of script written for conky
+ * (http://pastebin.com/wK7JmG9H).
+ *
  * Color schemes were inspired by solarized color scheme
  * (http://ethanschoonover.com/solarized). Mid color scheme is best used with
  * background color #002B36.
